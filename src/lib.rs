@@ -6,7 +6,13 @@ use std::str;
 use wasm_bindgen::prelude::*;
 
 // NOTE: Data Structures
-// Metadata for a newly created token
+#[derive(Serialize)]
+struct InitializeSimple {
+    name: String,
+    tokenName: String,
+    symbol: String,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ComputedTokenMetaData {
     pub name: String,
@@ -19,14 +25,74 @@ pub struct ComputedTokenMetaData {
 
 // Struct matching the Anchor IDL for Raydium initialize instruction
 #[derive(BorshDeserialize, Serialize, Deserialize)]
-pub struct BaseMintParam {
+pub struct MintParams {
+    pub decimals: u8,
     pub name: String,
     pub symbol: String,
+    pub uri: String,
 }
 
-#[derive(BorshDeserialize)]
+// The three Curve variants
+#[derive(BorshDeserialize, Serialize, Deserialize)]
+pub struct ConstantCurve {
+    pub supply: u64,
+    pub total_base_sell: u64,
+    pub total_quote_fund_raising: u64,
+    pub migrate_type: u8,
+}
+
+#[derive(BorshDeserialize, Serialize, Deserialize)]
+pub struct FixedCurve {
+    pub supply: u64,
+    pub total_quote_fund_raising: u64,
+    pub migrate_type: u8,
+}
+
+#[derive(BorshDeserialize, Serialize, Deserialize)]
+pub struct LinearCurve {
+    pub supply: u64,
+    pub total_quote_fund_raising: u64,
+    pub migrate_type: u8,
+}
+
+// 3) CurveParams enum ⟶ matches IDL "CurveParams"
+#[derive(BorshDeserialize, Serialize, Deserialize)]
+pub enum CurveParams {
+    Constant { data: ConstantCurve },
+    Fixed { data: FixedCurve },
+    Linear { data: LinearCurve },
+}
+
+#[derive(BorshDeserialize, Serialize, Deserialize)]
+pub struct VestingParam {
+    /// number of tokens locked, as a u64
+    pub total_locked_amount: u64,
+    /// cliff (in seconds, or whatever unit your IDL uses)
+    pub cliff_period: u64,
+    /// unlock period (same unit)
+    pub unlock_period: u64,
+}
+
+// BuyExactIn struct must match your IDL’s args:
+#[derive(BorshDeserialize, Serialize, Deserialize)]
+pub struct BuyExactInData {
+    pub amount_in: u64, // adjust types as needed (e.g. u128 via two u64)
+    pub minimum_amount_out: u64,
+    pub share_fee_rate: u64,
+}
+
+// 2. DecodedInstruction wrapper:
+#[derive(Serialize, Deserialize)]
+pub struct DecodedInstruction {
+    pub name: String,
+    pub data: serde_json::Value, // dynamic JSON payload
+}
+
+#[derive(BorshDeserialize, Serialize, Deserialize)]
 pub struct InitializeData {
-    pub base_mint_param: BaseMintParam,
+    pub base_mint_param: MintParams,
+    pub curve_param: CurveParams,
+    pub vesting_param: VestingParam,
 }
 
 // Struct for bonding curve data
@@ -44,19 +110,23 @@ pub struct BondingCurveState {
 /// Decode a Raydium Launchpad "initialize" instruction payload via Borsh
 #[wasm_bindgen]
 pub fn parseRaydiumInitialize(buf: &[u8]) -> JsValue {
-    // Ensure we have at least 8 bytes to skip
+    // must have at least 8 discriminator bytes
     if buf.len() <= 8 {
         return JsValue::NULL;
     }
-    // Skip the 8-byte Anchor discriminator
-    let args = &buf[8..];
-    match InitializeData::try_from_slice(args) {
-        Ok(init) => {
-            // Serialize only the base_mint_param (name + symbol)
-            serde_wasm_bindgen::to_value(&init.base_mint_param).unwrap_or(JsValue::NULL)
-        }
-        Err(_) => JsValue::NULL,
+    let payload = &buf[8..];
+
+    if let Ok(init_data) = InitializeData::try_from_slice(payload) {
+        let simple = InitializeSimple {
+            name: "initialize".into(),
+            tokenName: init_data.base_mint_param.name,
+            symbol: init_data.base_mint_param.symbol,
+        };
+
+        return to_value(&simple).unwrap_or(JsValue::NULL);
     }
+
+    JsValue::NULL
 }
 
 // NOTE: Pump.fun / LetsBonk Instruction Parser
