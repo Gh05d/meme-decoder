@@ -2,6 +2,9 @@
 name = "meme_decoder"
 version = "0.1.0"
 edition = "2021"
+description = "A WebAssembly (WASM) library for decoding Solana meme token creation instructions from various platforms."
+repository = "https://github.com/Gh05d/meme-decoder"
+license = "UNLICENSE-1.1"
 
 [lib]
 crate-type = ["cdylib"]
