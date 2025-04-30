@@ -22,7 +22,7 @@ Installation
 ## Clone the repository
 
 ```bash
-git clone <https://github.com/yourusername/meme-decoder.git>
+git clone https://github.com/Gh05d/meme-decoder.git
 cd meme-decoder
 ```
 
@@ -35,14 +35,14 @@ cd meme-decoder
 In JavaScript/TypeScript
 
 ```typescript
-import init, { parse_create_instruction, decode_initialize } from 'meme-decoder';
+import init, { parsePumpFunCreate, parseRaydiumInitialize } from 'meme-decoder';
 
 // Initialize the WASM module
 await init();
 
 // Parse a Pump.fun/LetsBonk token creation instruction
 const instructionData = new Uint8Array([/*your instruction data*/]);
-const tokenMetadata = parse_create_instruction(instructionData);
+const tokenMetadata = parsePumpFunCreate(instructionData);
 if (tokenMetadata) {
   console.log('Token Name:', tokenMetadata.name);
   console.log('Token Symbol:', tokenMetadata.symbol);
@@ -54,7 +54,7 @@ if (tokenMetadata) {
 
 // Decode a Raydium Launchpad initialize instruction
 const raydiumData = new Uint8Array([/*your Raydium instruction data*/]);
-const raydiumMetadata = decode_initialize(raydiumData);
+const raydiumMetadata = parseRaydiumInitialize(raydiumData);
 if (raydiumMetadata) {
   console.log('Token Name:', raydiumMetadata.name);
   console.log('Token Symbol:', raydiumMetadata.symbol);

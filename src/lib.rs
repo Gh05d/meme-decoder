@@ -38,7 +38,7 @@ pub struct InitializeData {
 
 /// Decode a Raydium Launchpad "initialize" instruction payload via Borsh
 #[wasm_bindgen]
-pub fn decode_initialize(buf: &[u8]) -> JsValue {
+pub fn parseRaydiumInitialize(buf: &[u8]) -> JsValue {
     match InitializeData::try_from_slice(buf) {
         Ok(data) => {
             // Return only name and symbol
@@ -109,7 +109,7 @@ fn try_parse_create(data: &[u8]) -> Option<ComputedTokenMetaData> {
 
 /// WASM-exported parser that wraps the Option into JsValue
 #[wasm_bindgen]
-pub fn parse_create_instruction(data: &[u8]) -> JsValue {
+pub fn parsePumpFunCreate(data: &[u8]) -> JsValue {
     if let Some(meta) = try_parse_create(data) {
         to_value(&meta).unwrap_or(JsValue::NULL)
     } else {
