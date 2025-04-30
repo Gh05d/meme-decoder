@@ -44,16 +44,22 @@ pub struct BondingCurveState {
 /// Decode a Raydium Launchpad "initialize" instruction payload via Borsh
 #[wasm_bindgen]
 pub fn parseRaydiumInitialize(buf: &[u8]) -> JsValue {
-    match InitializeData::try_from_slice(buf) {
-        Ok(data) => {
-            // Return only name and symbol
-            to_value(&data.base_mint_param).unwrap_or(JsValue::NULL)
+    // Ensure we have at least 8 bytes to skip
+    if buf.len() <= 8 {
+        return JsValue::NULL;
+    }
+    // Skip the 8-byte Anchor discriminator
+    let args = &buf[8..];
+    match InitializeData::try_from_slice(args) {
+        Ok(init) => {
+            // Serialize only the base_mint_param (name + symbol)
+            serde_wasm_bindgen::to_value(&init.base_mint_param).unwrap_or(JsValue::NULL)
         }
         Err(_) => JsValue::NULL,
     }
 }
 
-// === Pump.fun / LetsBonk Instruction Parser ===
+// NOTE: Pump.fun / LetsBonk Instruction Parser
 /// Internal parser returning Option; uses no `?` in JsValue function
 fn try_parse_create(data: &[u8]) -> Option<ComputedTokenMetaData> {
     if data.len() < 8 {
