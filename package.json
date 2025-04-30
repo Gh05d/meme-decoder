@@ -1,0 +1,12 @@
+{
+  "name": "meme-decoder",
+  "version": "1.0.0",
+  "description": "A WebAssembly (WASM) library for decoding Solana meme token creation instructions from various platforms.",
+  "main": "pkg/meme_decoder.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
