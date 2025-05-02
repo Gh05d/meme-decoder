@@ -1,5 +1,4 @@
 use borsh::BorshDeserialize;
-use bs58::decode as bs58_decode;
 use bs58::encode as bs58_encode;
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::to_value;
@@ -86,7 +85,8 @@ struct ComputedTokenMetaData {
     symbol: String,
     uri: String,
     mint: String,
-    bondingCurve: String,
+    #[serde(rename = "bondingCurve")]
+    bonding_curve: String,
     developer: String,
 }
 
@@ -173,8 +173,8 @@ pub struct TokenMintParams {
 
 // NOTE: Parsers
 /// WASM-exported parser for Boop.create_token
-#[wasm_bindgen]
-pub fn parseBoopCreateToken(data: &[u8]) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = "parseBoopCreateToken")]
+pub fn parse_boop_create_token(data: &[u8]) -> Result<JsValue, JsValue> {
     let buf = payload(data)?;
     let args = CreateTokenBoopArgs::try_from_slice(buf)
         .map_err(|e| JsValue::from_str(&format!("Deserialization failed: {}", e)))?;
@@ -187,8 +187,8 @@ pub fn parseBoopCreateToken(data: &[u8]) -> Result<JsValue, JsValue> {
 }
 
 /// WASM-exported parser for Pump.fun create instruction
-#[wasm_bindgen]
-pub fn parsePumpFunCreate(data: &[u8]) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = "parsePumpFunCreate")]
+pub fn parse_pump_fun_create(data: &[u8]) -> Result<JsValue, JsValue> {
     let buf = payload(data)?;
     let mut off = 0;
 
@@ -211,7 +211,7 @@ pub fn parsePumpFunCreate(data: &[u8]) -> Result<JsValue, JsValue> {
 }
 
 /// WASM-exported parser for curve state
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = "parseCurveState")]
 pub fn parse_curve_state(data: &[u8]) -> Result<JsValue, JsValue> {
     let buf = payload(data)?;
     let mut off = 0;
@@ -237,8 +237,8 @@ pub fn parse_curve_state(data: &[u8]) -> Result<JsValue, JsValue> {
 }
 
 /// WASM-exported parser for Raydium initialize
-#[wasm_bindgen]
-pub fn parseRaydiumInitialize(data: &[u8]) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = "parseRaydiumInitialize")]
+pub fn parse_raydium_initialize(data: &[u8]) -> Result<JsValue, JsValue> {
     let buf: &[u8] = payload(data)?;
     // Reuse BorshDeserialize on your IDL-matching struct here.
     let init: InitializeData = InitializeData::try_from_slice(buf)
@@ -252,8 +252,8 @@ pub fn parseRaydiumInitialize(data: &[u8]) -> Result<JsValue, JsValue> {
 }
 
 /// WASM-exported parser for Moonshot `initialize` instruction data
-#[wasm_bindgen]
-pub fn parseMoonshotTokenMint(data: &[u8]) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = "parseMoonshotTokenMint")]
+pub fn parse_moonshot_token_mint(data: &[u8]) -> Result<JsValue, JsValue> {
     // 1. Get the payload (skip the 8-byte discriminator)
     let buf = payload(data)?;
 
