@@ -16,3 +16,6 @@ serde-wasm-bindgen  = "0.4"                # efficient JsValue ↔ Serde seriali
 borsh               = "0.10"               # Rust Borsh implementation for Anchor data :contentReference[oaicite:4]{index=4}
 bs58                = "0.4"                # Base58 encoding for public keys :contentReference[oaicite:5]{index=5}
 serde_json = "1.0"
+console_error_panic_hook = "0.1.7"
+web-sys = { version = "0.3", features = ["console"] }
+

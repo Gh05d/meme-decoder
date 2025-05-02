@@ -4,6 +4,16 @@ use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::to_value;
 use std::str;
 use wasm_bindgen::prelude::*;
+use web_sys::console;
+
+// Import console_error_panic_hook properly
+extern crate console_error_panic_hook;
+
+// Define the console_log macro
+#[macro_export]
+macro_rules! console_log {
+    ($($t:tt)*) => (console::log_1(&format!($($t)*).into()))
+}
 
 // NOTE: Data Structures
 #[derive(Serialize)]
@@ -268,6 +278,8 @@ pub fn parseBoopInitialize(data: &[u8]) -> JsValue {
     }
 
     let payload = &data[8..];
+    console_log!("Payload length: {}", payload.len());
+
     if let Ok(parsed) = LaunchArgs::try_from_slice(payload) {
         let meta = ComputedTokenMetaData {
             name: parsed.name,
