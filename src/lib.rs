@@ -1,7 +1,6 @@
 use borsh::BorshDeserialize;
 use bs58::encode as bs58_encode;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use serde_wasm_bindgen::to_value;
 use std::str;
 use wasm_bindgen::prelude::*;
@@ -12,6 +11,16 @@ struct InitializeSimple {
     name: String,
     tokenName: String,
     symbol: String,
+}
+
+#[derive(BorshDeserialize, Serialize, Deserialize)]
+pub struct LaunchArgs {
+    pub name: String,
+    pub symbol: String,
+    pub uri: String,
+    pub mint: [u8; 32],
+    pub bonding_curve: [u8; 32],
+    pub developer: [u8; 32],
 }
 
 #[derive(Serialize, Deserialize)]
@@ -252,10 +261,23 @@ pub fn parse_curve_state(data: &[u8]) -> JsValue {
     }
 }
 
-/// Extracts ComputedTokenMetaData from an Anchor IDL JSON string
 #[wasm_bindgen]
-pub fn parseBoop(data: &[u8]) -> JsValue {
-    if let Some(meta) = try_parse_create(data) {
+pub fn parseBoopInitialize(data: &[u8]) -> JsValue {
+    if data.len() < 8 {
+        return JsValue::NULL;
+    }
+
+    let payload = &data[8..];
+    if let Ok(parsed) = LaunchArgs::try_from_slice(payload) {
+        let meta = ComputedTokenMetaData {
+            name: parsed.name,
+            symbol: parsed.symbol,
+            uri: parsed.uri,
+            mint: bs58_encode(parsed.mint).into_string(),
+            bondingCurve: bs58_encode(parsed.bonding_curve).into_string(),
+            developer: bs58_encode(parsed.developer).into_string(),
+        };
+
         to_value(&meta).unwrap_or(JsValue::NULL)
     } else {
         JsValue::NULL
