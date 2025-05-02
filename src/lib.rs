@@ -257,10 +257,32 @@ pub fn parse_moonshot_token_mint(data: &[u8]) -> Result<JsValue, JsValue> {
     // 1. Get the payload (skip the 8-byte discriminator)
     let buf = payload(data)?;
 
-    // 2. Deserialize into your struct
-    let params = TokenMintParams::try_from_slice(buf)
-        .map_err(|e| JsValue::from_str(&format!("Deserialization failed: {}", e)))?;
+    // Log the buffer length for debugging
+    console_log!("Moonshot buffer length: {}", buf.len());
 
-    // 3. Convert Rust struct into a JS value
-    to_value(&params).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
+    // Try partial deserialization to see what works
+    let mut debug_info = serde_json::json!({
+        "buffer_length": buf.len(),
+        "buffer_hex": format!("{:02X?}", buf)
+    });
+
+    // 2. Attempt to deserialize with detailed error handling
+    match TokenMintParams::try_from_slice(buf) {
+        Ok(params) => {
+            // Success case - return the params
+            return to_value(&params)
+                .map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)));
+        }
+        Err(e) => {
+            // Enhanced error information
+            debug_info["error"] = serde_json::json!(format!("{}", e));
+
+            // Try to deserialize with a more flexible approach
+            return Err(JsValue::from_str(&format!(
+                "Deserialization failed: {}. Debug info: {}",
+                e,
+                serde_json::to_string_pretty(&debug_info).unwrap_or_default()
+            )));
+        }
+    }
 }
