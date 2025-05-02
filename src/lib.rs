@@ -1,4 +1,5 @@
 use borsh::BorshDeserialize;
+use bs58::decode as bs58_decode;
 use bs58::encode as bs58_encode;
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::to_value;
@@ -157,6 +158,19 @@ pub struct InitializeData {
     pub vesting_param: VestingParam,
 }
 
+// Your Moonshot struct matching the IDL layout
+#[derive(BorshDeserialize, Serialize)]
+pub struct TokenMintParams {
+    pub name: String,
+    pub symbol: String,
+    pub uri: String,
+    pub decimals: u8,
+    pub collateral_currency: u8,
+    pub amount: u64,
+    pub curve_type: u8,
+    pub migration_target: u8,
+}
+
 // NOTE: Parsers
 /// WASM-exported parser for Boop.create_token
 #[wasm_bindgen]
@@ -235,4 +249,23 @@ pub fn parseRaydiumInitialize(data: &[u8]) -> Result<JsValue, JsValue> {
         symbol: init.base_mint_param.symbol,
     };
     to_value(&simple).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
+}
+
+/// WASM-exported parser for Moonshot `initialize` instruction data
+#[wasm_bindgen]
+pub fn parseMoonshotTokenMint(ix_data: &str) -> Result<JsValue, JsValue> {
+    // 1. Decode base58 string to raw bytes
+    let raw = bs58_decode(ix_data)
+        .into_vec()
+        .map_err(|e| JsValue::from_str(&format!("Base58 decode failed: {}", e)))?;
+
+    // 2. Strip the 8-byte Anchor discriminator
+    let buf = payload(&raw)?;
+
+    // 3. Deserialize into your struct
+    let params = TokenMintParams::try_from_slice(buf)
+        .map_err(|e| JsValue::from_str(&format!("Deserialization failed: {}", e)))?;
+
+    // 4. Convert Rust struct into a JS value
+    to_value(&params).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
 }
