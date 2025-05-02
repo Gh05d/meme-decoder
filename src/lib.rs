@@ -5,6 +5,7 @@ use serde_json::json;
 use serde_wasm_bindgen::to_value;
 use std::str;
 use wasm_bindgen::prelude::*;
+use web_sys::console;
 
 // Import console_error_panic_hook properly
 extern crate console_error_panic_hook;
