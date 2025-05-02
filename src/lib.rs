@@ -1,6 +1,7 @@
 use borsh::BorshDeserialize;
 use bs58::encode as bs58_encode;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use serde_wasm_bindgen::to_value;
 use std::str;
 use wasm_bindgen::prelude::*;
@@ -249,4 +250,82 @@ pub fn parse_curve_state(data: &[u8]) -> JsValue {
     } else {
         JsValue::NULL
     }
+}
+
+/// Extracts ComputedTokenMetaData from an Anchor IDL JSON string
+#[wasm_bindgen]
+pub fn parseBoop(idl_json: &str) -> JsValue {
+    // 1. Parse the JSON
+    let idl: Value = match serde_json::from_str(idl_json) {
+        Ok(v) => v,
+        Err(_) => return JsValue::NULL,
+    };
+
+    // 2. Find the `create_token` instruction
+    let create_ix = idl
+        .get("instructions")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| {
+            arr.iter()
+                .find(|i| i.get("name").and_then(|n| n.as_str()) == Some("create_token"))
+        });
+    let ix = match create_ix {
+        Some(ix) => ix,
+        None => return JsValue::NULL,
+    };
+
+    // 3. Grab the args array as a slice (empty slice if missing)
+    let args: &[Value] = ix
+        .get("args")
+        .and_then(|v| v.as_array().map(Vec::as_slice))
+        .unwrap_or(&[]);
+
+    // Helper to look up string-valued args
+    let get_arg_str = |key: &str| {
+        args.iter()
+            .find(|a| a.get("name").and_then(|n| n.as_str()) == Some(key))
+            .and_then(|a| a.get("type").and_then(|t| t.as_str()))
+            .unwrap_or("")
+            .to_string()
+    };
+
+    // 4. Pull out name, symbol, uri
+    let name = get_arg_str("name");
+    let symbol = get_arg_str("symbol");
+    let uri = get_arg_str("uri");
+
+    // 5. Do the same for accounts—treat missing as empty slice
+    let accounts: &[Value] = ix
+        .get("accounts")
+        .and_then(|v| v.as_array().map(Vec::as_slice))
+        .unwrap_or(&[]);
+    let mint = accounts
+        .iter()
+        .find(|acc| acc.get("name").and_then(|n| n.as_str()) == Some("mint"))
+        .and_then(|acc| acc.get("address").and_then(|a| a.as_str()))
+        .unwrap_or("")
+        .to_string();
+
+    // 6. bondingCurve & developer aren’t in this IDL’s create_token, so leave empty
+    let bonding_curve = String::new();
+    let developer = String::new();
+
+    // 7. Build your metadata struct and hand it back to JS
+    let meta = ComputedTokenMetaData {
+        name,
+        symbol,
+        uri,
+        mint,
+        bondingCurve: bonding_curve,
+        developer,
+    };
+
+    to_value(&meta).unwrap_or(JsValue::NULL)
+}
+
+const BOOP_IDL: &str = include_str!("../idls/boop_idl.json");
+
+#[wasm_bindgen]
+pub fn extract_boop_metadata_from_idl() -> JsValue {
+    parseBoop(BOOP_IDL)
 }
