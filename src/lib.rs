@@ -270,9 +270,9 @@ pub fn parse_curve_state(data: &[u8]) -> JsValue {
 }
 
 #[wasm_bindgen]
-pub fn parseBoopCreateToken(data: &[u8]) -> JsValue {
+pub fn parseBoopCreateToken(data: &[u8]) -> Result<JsValue, JsValue> {
     if data.len() < 8 {
-        return JsValue::NULL;
+        return Err(JsValue::from_str("Data too short"));
     }
 
     let payload = &data[8..]; // Skip discriminator
@@ -281,19 +281,27 @@ pub fn parseBoopCreateToken(data: &[u8]) -> JsValue {
         Ok(parsed) => {
             console_log!("Successfully parsed Boop token: {}", parsed.name);
 
-            let result = CreateTokenBoopArgs {
-                salt: parsed.salt,
-                name: parsed.name,
-                symbol: parsed.symbol,
-                uri: parsed.uri,
-            };
+            serde_wasm_bindgen::to_value(&parsed).map_err(|err| {
+                console_log!("Serialization error: {:?}", err);
+                JsValue::from_str(&format!("Serialization error: {:?}", err))
+            })
 
-            return to_value(&result).unwrap_or(JsValue::NULL);
+            // let result = CreateTokenBoopArgs {
+            //     salt: parsed.salt,
+            //     name: parsed.name,
+            //     symbol: parsed.symbol,
+            //     uri: parsed.uri,
+            // };
+
+            // return to_value(&result).unwrap_or(JsValue::NULL);
         }
         Err(err) => {
             console_log!("Failed to parse Boop token: {}", err);
 
-            JsValue::NULL
+            Err(JsValue::from_str(&format!(
+                "Deserialization error: {}",
+                err
+            )))
         }
     }
 }
