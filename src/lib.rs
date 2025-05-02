@@ -204,7 +204,7 @@ pub fn parse_pump_fun_create(data: &[u8]) -> Result<JsValue, JsValue> {
         symbol,
         uri,
         mint,
-        bondingCurve: bonding_curve,
+        bonding_curve,
         developer,
     };
     to_value(&meta).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
