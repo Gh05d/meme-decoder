@@ -239,7 +239,7 @@ pub fn parse_curve_state(data: &[u8]) -> Result<JsValue, JsValue> {
 /// WASM-exported parser for Raydium initialize
 #[wasm_bindgen]
 pub fn parseRaydiumInitialize(data: &[u8]) -> Result<JsValue, JsValue> {
-    let buf = payload(data)?;
+    let buf: &[u8] = payload(data)?;
     // Reuse BorshDeserialize on your IDL-matching struct here.
     let init: InitializeData = InitializeData::try_from_slice(buf)
         .map_err(|e| JsValue::from_str(&format!("Deserialization failed: {}", e)))?;
@@ -253,19 +253,14 @@ pub fn parseRaydiumInitialize(data: &[u8]) -> Result<JsValue, JsValue> {
 
 /// WASM-exported parser for Moonshot `initialize` instruction data
 #[wasm_bindgen]
-pub fn parseMoonshotTokenMint(ix_data: &str) -> Result<JsValue, JsValue> {
-    // 1. Decode base58 string to raw bytes
-    let raw = bs58_decode(ix_data)
-        .into_vec()
-        .map_err(|e| JsValue::from_str(&format!("Base58 decode failed: {}", e)))?;
+pub fn parseMoonshotTokenMint(data: &[u8]) -> Result<JsValue, JsValue> {
+    // 1. Get the payload (skip the 8-byte discriminator)
+    let buf = payload(data)?;
 
-    // 2. Strip the 8-byte Anchor discriminator
-    let buf = payload(&raw)?;
-
-    // 3. Deserialize into your struct
+    // 2. Deserialize into your struct
     let params = TokenMintParams::try_from_slice(buf)
         .map_err(|e| JsValue::from_str(&format!("Deserialization failed: {}", e)))?;
 
-    // 4. Convert Rust struct into a JS value
+    // 3. Convert Rust struct into a JS value
     to_value(&params).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
 }
