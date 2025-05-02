@@ -1,7 +1,6 @@
 use borsh::BorshDeserialize;
 use bs58::encode as bs58_encode;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use serde_wasm_bindgen::to_value;
 use std::str;
 use wasm_bindgen::prelude::*;
@@ -24,7 +23,7 @@ struct InitializeSimple {
     symbol: String,
 }
 
-#[derive(BorshDeserialize, Debug)]
+#[derive(Serialize, BorshDeserialize, Debug)]
 pub struct CreateTokenBoopArgs {
     pub salt: u64,
     pub name: String,
@@ -282,14 +281,14 @@ pub fn parseBoopCreateToken(data: &[u8]) -> JsValue {
         Ok(parsed) => {
             console_log!("Successfully parsed Boop token: {}", parsed.name);
 
-            let result = json!({
-                "salt": parsed.salt,
-                "name": parsed.name,
-                "symbol": parsed.symbol,
-                "uri": parsed.uri
-            });
+            let result = CreateTokenBoopArgs {
+                salt: parsed.salt,
+                name: parsed.name,
+                symbol: parsed.symbol,
+                uri: parsed.uri,
+            };
 
-            to_value(&result).unwrap_or(JsValue::NULL)
+            return to_value(&result).unwrap_or(JsValue::NULL);
         }
         Err(err) => {
             console_log!("Failed to parse Boop token: {}", err);
