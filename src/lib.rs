@@ -4,26 +4,73 @@ use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::to_value;
 use std::str;
 use wasm_bindgen::prelude::*;
-use web_sys::console;
 
-// Import console_error_panic_hook properly
-extern crate console_error_panic_hook;
-
-// Define the console_log macro
+// Console logging macro
 #[macro_export]
 macro_rules! console_log {
-    ($($t:tt)*) => (console::log_1(&format!($($t)*).into()))
+    ($($t:tt)*) => (web_sys::console::log_1(&format!($($t)*).into()));
 }
 
-// NOTE: Data Structures
+// NOTE: Functions
+/// Skip the 8-byte discriminator and return the payload or an error.
+fn payload<'a>(data: &'a [u8]) -> Result<&'a [u8], JsValue> {
+    if data.len() < 8 {
+        Err(JsValue::from_str("Data too short"))
+    } else {
+        Ok(&data[8..])
+    }
+}
+
+/// Read a little-endian integer of fixed byte length.
+fn read_le<const N: usize>(buf: &[u8], off: &mut usize) -> Result<[u8; N], JsValue> {
+    if buf.len() < *off + N {
+        Err(JsValue::from_str("Unexpected buffer length"))
+    } else {
+        let mut arr = [0u8; N];
+        arr.copy_from_slice(&buf[*off..*off + N]);
+        *off += N;
+        Ok(arr)
+    }
+}
+
+/// Read a u32 in LE format.
+fn read_u32(buf: &[u8], off: &mut usize) -> Result<u32, JsValue> {
+    let bytes = read_le::<4>(buf, off)?;
+    Ok(u32::from_le_bytes(bytes))
+}
+
+/// Read a u64 in LE format.
+fn read_u64(buf: &[u8], off: &mut usize) -> Result<u64, JsValue> {
+    let bytes = read_le::<8>(buf, off)?;
+    Ok(u64::from_le_bytes(bytes))
+}
+
+/// Read a length-prefixed UTF-8 string.
+fn read_string(buf: &[u8], off: &mut usize) -> Result<String, JsValue> {
+    let len = read_u32(buf, off)? as usize;
+    if buf.len() < *off + len {
+        return Err(JsValue::from_str("String length exceeds buffer"));
+    }
+    let s =
+        str::from_utf8(&buf[*off..*off + len]).map_err(|_| JsValue::from_str("Invalid UTF-8"))?;
+    *off += len;
+    Ok(s.to_owned())
+}
+
+/// Read a 32-byte public key and Base58-encode it.
+fn read_pubkey(buf: &[u8], off: &mut usize) -> Result<String, JsValue> {
+    let key = read_le::<32>(buf, off)?;
+    Ok(bs58_encode(key).into_string())
+}
+
+// NOTE: Structs
 #[derive(Serialize)]
 struct InitializeSimple {
     name: String,
-    tokenName: String,
     symbol: String,
 }
 
-#[derive(Serialize, BorshDeserialize, Debug)]
+#[derive(BorshDeserialize, Debug)]
 pub struct CreateTokenBoopArgs {
     pub salt: u64,
     pub name: String,
@@ -31,23 +78,26 @@ pub struct CreateTokenBoopArgs {
     pub uri: String,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct ComputedTokenMetaData {
-    pub name: String,
-    pub symbol: String,
-    pub uri: String,
-    pub mint: String,
-    pub bondingCurve: String,
-    pub developer: String,
+/// Metadata struct for Pump.fun / LetsBonk create
+#[derive(Serialize)]
+struct ComputedTokenMetaData {
+    name: String,
+    symbol: String,
+    uri: String,
+    mint: String,
+    bondingCurve: String,
+    developer: String,
 }
 
-// Struct matching the Anchor IDL for Raydium initialize instruction
-#[derive(BorshDeserialize, Serialize, Deserialize)]
-pub struct MintParams {
-    pub decimals: u8,
-    pub name: String,
-    pub symbol: String,
-    pub uri: String,
+/// Bonding curve state struct.
+#[derive(Serialize)]
+struct BondingCurveState {
+    virtual_token_reserves: u64,
+    virtual_sol_reserves: u64,
+    real_token_reserves: u64,
+    real_sol_reserves: u64,
+    token_total_supply: u64,
+    complete: bool,
 }
 
 // The three Curve variants
@@ -91,19 +141,13 @@ pub struct VestingParam {
     pub unlock_period: u64,
 }
 
-// BuyExactIn struct must match your IDL’s args:
+// Struct matching the Anchor IDL for Raydium initialize instruction
 #[derive(BorshDeserialize, Serialize, Deserialize)]
-pub struct BuyExactInData {
-    pub amount_in: u64, // adjust types as needed (e.g. u128 via two u64)
-    pub minimum_amount_out: u64,
-    pub share_fee_rate: u64,
-}
-
-// 2. DecodedInstruction wrapper:
-#[derive(Serialize, Deserialize)]
-pub struct DecodedInstruction {
+pub struct MintParams {
+    pub decimals: u8,
     pub name: String,
-    pub data: serde_json::Value, // dynamic JSON payload
+    pub symbol: String,
+    pub uri: String,
 }
 
 #[derive(BorshDeserialize, Serialize, Deserialize)]
@@ -113,192 +157,82 @@ pub struct InitializeData {
     pub vesting_param: VestingParam,
 }
 
-// Struct for bonding curve data
-#[derive(Serialize, Deserialize)]
-pub struct BondingCurveState {
-    pub virtual_token_reserves: u64,
-    pub virtual_sol_reserves: u64,
-    pub real_token_reserves: u64,
-    pub real_sol_reserves: u64,
-    pub token_total_supply: u64,
-    pub complete: bool,
-}
-
-// NOTE: Raydium Borsh Decode
-/// Decode a Raydium Launchpad "initialize" instruction payload via Borsh
+// NOTE: Parsers
+/// WASM-exported parser for Boop.create_token
 #[wasm_bindgen]
-pub fn parseRaydiumInitialize(buf: &[u8]) -> JsValue {
-    // must have at least 8 discriminator bytes
-    if buf.len() <= 8 {
-        return JsValue::NULL;
-    }
-    let payload = &buf[8..];
+pub fn parseBoopCreateToken(data: &[u8]) -> Result<JsValue, JsValue> {
+    let buf = payload(data)?;
+    let args = CreateTokenBoopArgs::try_from_slice(buf)
+        .map_err(|e| JsValue::from_str(&format!("Deserialization failed: {}", e)))?;
 
-    if let Ok(init_data) = InitializeData::try_from_slice(payload) {
-        let simple = InitializeSimple {
-            name: "initialize".into(),
-            tokenName: init_data.base_mint_param.name,
-            symbol: init_data.base_mint_param.symbol,
-        };
-
-        return to_value(&simple).unwrap_or(JsValue::NULL);
-    }
-
-    JsValue::NULL
-}
-
-// NOTE: Pump.fun / LetsBonk Instruction Parser
-/// Internal parser returning Option; uses no `?` in JsValue function
-fn try_parse_create(data: &[u8]) -> Option<ComputedTokenMetaData> {
-    if data.len() < 8 {
-        return None;
-    }
-    let mut offset = 8;
-    let mut meta = ComputedTokenMetaData {
-        name: String::new(),
-        symbol: String::new(),
-        uri: String::new(),
-        mint: String::new(),
-        bondingCurve: String::new(),
-        developer: String::new(),
+    let resp = InitializeSimple {
+        name: args.name,
+        symbol: args.symbol,
     };
-
-    // Helper to read a little-endian u32
-    fn read_u32_le(buf: &[u8], off: &mut usize) -> Option<u32> {
-        if buf.len() < *off + 4 {
-            return None;
-        }
-        let val = u32::from_le_bytes([buf[*off], buf[*off + 1], buf[*off + 2], buf[*off + 3]]);
-        *off += 4;
-        Some(val)
-    }
-
-    // Read a UTF-8 string field
-    fn read_string(buf: &[u8], off: &mut usize) -> Option<String> {
-        let len = read_u32_le(buf, off)? as usize;
-        if buf.len() < *off + len {
-            return None;
-        }
-        let s = str::from_utf8(&buf[*off..*off + len]).ok()?;
-        *off += len;
-        Some(s.to_string())
-    }
-
-    // Read a 32-byte publicKey and Base58-encode it
-    fn read_pubkey(buf: &[u8], off: &mut usize) -> Option<String> {
-        if buf.len() < *off + 32 {
-            return None;
-        }
-        let key = &buf[*off..*off + 32];
-        *off += 32;
-        Some(bs58_encode(key).into_string())
-    }
-
-    // Parse fields in order
-    meta.name = read_string(data, &mut offset)?;
-    meta.symbol = read_string(data, &mut offset)?;
-    meta.uri = read_string(data, &mut offset)?;
-    meta.mint = read_pubkey(data, &mut offset)?;
-    meta.bondingCurve = read_pubkey(data, &mut offset)?;
-    meta.developer = read_pubkey(data, &mut offset)?;
-
-    Some(meta)
+    to_value(&resp).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
 }
 
-// WASM-exported parser that wraps the Option into JsValue
+/// WASM-exported parser for Pump.fun create instruction
 #[wasm_bindgen]
-pub fn parsePumpFunCreate(data: &[u8]) -> JsValue {
-    if let Some(meta) = try_parse_create(data) {
-        to_value(&meta).unwrap_or(JsValue::NULL)
-    } else {
-        JsValue::NULL
-    }
+pub fn parsePumpFunCreate(data: &[u8]) -> Result<JsValue, JsValue> {
+    let buf = payload(data)?;
+    let mut off = 0;
+
+    let name = read_string(buf, &mut off)?;
+    let symbol = read_string(buf, &mut off)?;
+    let uri = read_string(buf, &mut off)?;
+    let mint = read_pubkey(buf, &mut off)?;
+    let bonding_curve = read_pubkey(buf, &mut off)?;
+    let developer = read_pubkey(buf, &mut off)?;
+
+    let meta = ComputedTokenMetaData {
+        name,
+        symbol,
+        uri,
+        mint,
+        bondingCurve: bonding_curve,
+        developer,
+    };
+    to_value(&meta).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
 }
 
-// NOTE: Bonding-Curve State Decoder
-fn try_parse_curve(data: &[u8]) -> Option<BondingCurveState> {
-    // Expect at least 8(discriminator) + 6*8(u64) + 1(bool) = 57 bytes
-    if data.len() < 8 + 6 * 8 + 1 {
-        return None;
+/// WASM-exported parser for curve state
+#[wasm_bindgen]
+pub fn parse_curve_state(data: &[u8]) -> Result<JsValue, JsValue> {
+    let buf = payload(data)?;
+    let mut off = 0;
+    let virtual_token_reserves = read_u64(buf, &mut off)?;
+    let virtual_sol_reserves = read_u64(buf, &mut off)?;
+    let real_token_reserves = read_u64(buf, &mut off)?;
+    let real_sol_reserves = read_u64(buf, &mut off)?;
+    let token_total_supply = read_u64(buf, &mut off)?;
+    if buf.len() < off + 1 {
+        return Err(JsValue::from_str("Unexpected end of buffer"));
     }
-    let mut off = 8; // skip discriminator
+    let complete = buf[off] != 0;
 
-    fn read_u64_le(buf: &[u8], off: &mut usize) -> Option<u64> {
-        if buf.len() < *off + 8 {
-            return None;
-        }
-        let v = u64::from_le_bytes([
-            buf[*off],
-            buf[*off + 1],
-            buf[*off + 2],
-            buf[*off + 3],
-            buf[*off + 4],
-            buf[*off + 5],
-            buf[*off + 6],
-            buf[*off + 7],
-        ]);
-        *off += 8;
-        Some(v)
-    }
-
-    let virtual_token_reserves = read_u64_le(data, &mut off)?;
-    let virtual_sol_reserves = read_u64_le(data, &mut off)?;
-    let real_token_reserves = read_u64_le(data, &mut off)?;
-    let real_sol_reserves = read_u64_le(data, &mut off)?;
-    let token_total_supply = read_u64_le(data, &mut off)?;
-
-    // Read the `complete` flag (1 byte, non-zero = true)
-    let complete = data.get(off).copied().map(|b| b != 0)?;
-
-    Some(BondingCurveState {
+    let state = BondingCurveState {
         virtual_token_reserves,
         virtual_sol_reserves,
         real_token_reserves,
         real_sol_reserves,
         token_total_supply,
         complete,
-    })
+    };
+    to_value(&state).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
 }
 
+/// WASM-exported parser for Raydium initialize
 #[wasm_bindgen]
-pub fn parse_curve_state(data: &[u8]) -> JsValue {
-    if let Some(state) = try_parse_curve(data) {
-        to_value(&state).unwrap_or(JsValue::NULL)
-    } else {
-        JsValue::NULL
-    }
-}
+pub fn parseRaydiumInitialize(data: &[u8]) -> Result<JsValue, JsValue> {
+    let buf = payload(data)?;
+    // Reuse BorshDeserialize on your IDL-matching struct here.
+    let init: InitializeData = InitializeData::try_from_slice(buf)
+        .map_err(|e| JsValue::from_str(&format!("Deserialization failed: {}", e)))?;
 
-#[wasm_bindgen]
-pub fn parseBoopCreateToken(data: &[u8]) -> Result<JsValue, JsValue> {
-    if data.len() < 8 {
-        return Err(JsValue::from_str("Data too short"));
-    }
-
-    let payload = &data[8..]; // Skip discriminator
-
-    match CreateTokenBoopArgs::try_from_slice(payload) {
-        Ok(parsed) => {
-            console_log!("Successfully parsed Boop token: {}", parsed.name);
-
-            let result = InitializeSimple {
-                tokenName: parsed.name,
-                symbol: parsed.symbol,
-                name: "create".into(),
-            };
-
-            serde_wasm_bindgen::to_value(&result).map_err(|err| {
-                console_log!("Serialization error: {:?}", err);
-                JsValue::from_str(&format!("Serialization error: {:?}", err))
-            })
-        }
-        Err(err) => {
-            console_log!("Failed to parse Boop token: {}", err);
-
-            Err(JsValue::from_str(&format!(
-                "Deserialization error: {}",
-                err
-            )))
-        }
-    }
+    let simple = InitializeSimple {
+        name: init.base_mint_param.name,
+        symbol: init.base_mint_param.symbol,
+    };
+    to_value(&simple).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
 }
