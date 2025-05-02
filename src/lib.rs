@@ -25,6 +25,7 @@ struct InitializeSimple {
 
 #[derive(Serialize, BorshDeserialize, Debug)]
 pub struct CreateTokenBoopArgs {
+    pub salt: u64,
     pub name: String,
     pub symbol: String,
     pub uri: String,
@@ -280,10 +281,10 @@ pub fn parseBoopCreateToken(data: &[u8]) -> Result<JsValue, JsValue> {
         Ok(parsed) => {
             console_log!("Successfully parsed Boop token: {}", parsed.name);
 
-            let result = CreateTokenBoopArgs {
-                name: parsed.name,
+            let result = InitializeSimple {
+                tokenName: parsed.name,
                 symbol: parsed.symbol,
-                uri: parsed.uri,
+                name: "create".into(),
             };
 
             serde_wasm_bindgen::to_value(&result).map_err(|err| {
