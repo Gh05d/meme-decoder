@@ -158,35 +158,6 @@ pub struct InitializeData {
     pub vesting_param: VestingParam,
 }
 
-// Your Moonshot struct matching the IDL layout
-#[derive(BorshDeserialize, Serialize)]
-pub struct TokenMintParams {
-    pub name: String,
-    pub symbol: String,
-    pub uri: String,
-    pub decimals: u8,
-    pub collateral_currency: u8,
-    pub amount: u64,
-    pub curve_type: u8,
-    pub migration_target: u8,
-}
-
-// Updated Moonshot struct based on observed data
-#[derive(BorshDeserialize, Serialize)]
-pub struct MoonshotTokenParams {
-    pub name: String,
-    pub symbol: String,
-    pub uri: String,
-    pub decimals: u8,
-    pub collateral_currency: u8,
-    pub amount: u64,
-    pub curve_type: u8,
-    pub migration_target: u8,
-    // Additional fields observed in the data
-    pub unknown1: u32,
-    pub unknown2: u64,
-}
-
 // NOTE: Parsers
 /// WASM-exported parser for Boop.create_token
 #[wasm_bindgen(js_name = "parseBoopCreateToken")]
@@ -273,9 +244,6 @@ pub fn parse_moonshot_token_mint(data: &[u8]) -> Result<JsValue, JsValue> {
     // 1. Get the payload (skip the 8-byte discriminator)
     let buf = payload(data)?;
 
-    // Log the buffer length for debugging
-    console_log!("Moonshot buffer length: {}", buf.len());
-
     // First try the manual parser which is more reliable
     let mut off = 0;
     let name = match read_string(buf, &mut off) {
@@ -288,24 +256,10 @@ pub fn parse_moonshot_token_mint(data: &[u8]) -> Result<JsValue, JsValue> {
         Err(_) => return Err(JsValue::from_str("Failed to parse symbol")),
     };
 
-    let uri = match read_string(buf, &mut off) {
-        Ok(uri) => uri,
-        Err(_) => return Err(JsValue::from_str("Failed to parse URI")),
-    };
-
-    // Extract remaining bytes as hex for debugging
-    let remaining = if off < buf.len() {
-        format!("{:02X?}", &buf[off..])
-    } else {
-        "none".to_string()
-    };
-
     // Create a simple result with the extracted data
     let result = serde_json::json!({
         "name": name,
         "symbol": symbol,
-        "uri": uri,
-        "remaining_hex": remaining
     });
 
     to_value(&result).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
