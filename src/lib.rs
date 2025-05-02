@@ -1,10 +1,10 @@
 use borsh::BorshDeserialize;
 use bs58::encode as bs58_encode;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use serde_wasm_bindgen::to_value;
 use std::str;
 use wasm_bindgen::prelude::*;
-use web_sys::console;
 
 // Import console_error_panic_hook properly
 extern crate console_error_panic_hook;
@@ -23,14 +23,12 @@ struct InitializeSimple {
     symbol: String,
 }
 
-#[derive(BorshDeserialize, Serialize, Deserialize)]
-pub struct LaunchArgs {
+#[derive(BorshDeserialize, Debug)]
+pub struct CreateTokenBoopArgs {
+    pub salt: u64,
     pub name: String,
     pub symbol: String,
     pub uri: String,
-    pub mint: [u8; 32],
-    pub bonding_curve: [u8; 32],
-    pub developer: [u8; 32],
 }
 
 #[derive(Serialize, Deserialize)]
@@ -272,26 +270,30 @@ pub fn parse_curve_state(data: &[u8]) -> JsValue {
 }
 
 #[wasm_bindgen]
-pub fn parseBoopInitialize(data: &[u8]) -> JsValue {
+pub fn parseBoopCreateToken(data: &[u8]) -> JsValue {
     if data.len() < 8 {
         return JsValue::NULL;
     }
 
-    let payload = &data[8..];
-    console_log!("Payload length: {}", payload.len());
+    let payload = &data[8..]; // Skip discriminator
 
-    if let Ok(parsed) = LaunchArgs::try_from_slice(payload) {
-        let meta = ComputedTokenMetaData {
-            name: parsed.name,
-            symbol: parsed.symbol,
-            uri: parsed.uri,
-            mint: bs58_encode(parsed.mint).into_string(),
-            bondingCurve: bs58_encode(parsed.bonding_curve).into_string(),
-            developer: bs58_encode(parsed.developer).into_string(),
-        };
+    match CreateTokenBoopArgs::try_from_slice(payload) {
+        Ok(parsed) => {
+            console_log!("Successfully parsed Boop token: {}", parsed.name);
 
-        to_value(&meta).unwrap_or(JsValue::NULL)
-    } else {
-        JsValue::NULL
+            let result = json!({
+                "salt": parsed.salt,
+                "name": parsed.name,
+                "symbol": parsed.symbol,
+                "uri": parsed.uri
+            });
+
+            to_value(&result).unwrap_or(JsValue::NULL)
+        }
+        Err(err) => {
+            console_log!("Failed to parse Boop token: {}", err);
+
+            JsValue::NULL
+        }
     }
 }
