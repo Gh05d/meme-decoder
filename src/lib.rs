@@ -256,11 +256,8 @@ pub fn parse_moonshot_token_mint(data: &[u8]) -> Result<JsValue, JsValue> {
         Err(_) => return Err(JsValue::from_str("Failed to parse symbol")),
     };
 
-    // Create a simple result with the extracted data
-    let result = serde_json::json!({
-        "name": name,
-        "symbol": symbol,
-    });
+    let token_info = InitializeSimple { name, symbol };
 
-    to_value(&result).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
+    // Convert to JsValue using to_value
+    to_value(&token_info).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
 }
