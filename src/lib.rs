@@ -241,11 +241,12 @@ pub fn parse_pump_fun_curve_state(data: &[u8]) -> Result<JsValue, JsValue> {
 /// WASM-exported parser for Raydium Launchpad PoolState using JS BigInt
 #[wasm_bindgen(js_name = "parseLaunchpadPoolState")]
 pub fn parse_launchpad_pool_state(data: &[u8]) -> Result<JsValue, JsValue> {
-    let buf = payload(data)?;
+    let buf = payload(data)?; // strips 8-byte Anchor discriminator
     let mut off = 0;
 
-    // Anchor discriminator stripped; now parse PoolState fields in IDL order
+    // 1) epoch
     let epoch = read_u64(buf, &mut off)?;
+    // 2) skip the 5 u8 fields
     off += 1;
     let status = buf[off];
     off += 1;
@@ -255,13 +256,14 @@ pub fn parse_launchpad_pool_state(data: &[u8]) -> Result<JsValue, JsValue> {
     off += 1;
     let migrate_type = buf[off];
     off += 1;
+
+    // 3) core u64 fields
     let supply = read_u64(buf, &mut off)?;
     let total_base_sell = read_u64(buf, &mut off)?;
     let virtual_base = read_u64(buf, &mut off)?;
     let virtual_quote = read_u64(buf, &mut off)?;
     let real_base = read_u64(buf, &mut off)?;
     let real_quote = read_u64(buf, &mut off)?;
-    // (rest of fields omitted for brevity)
 
     // Build JS object with key fields
     let obj = Object::new();
