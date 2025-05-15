@@ -244,9 +244,7 @@ pub fn parse_launchpad_pool_state(data: &[u8]) -> Result<JsValue, JsValue> {
     let buf = payload(data)?; // strips 8-byte Anchor discriminator
     let mut off = 0;
 
-    // 1) epoch
     let epoch = read_u64(buf, &mut off)?;
-    // 2) skip the 5 u8 fields
     off += 1;
     let status = buf[off];
     off += 1;
@@ -257,9 +255,9 @@ pub fn parse_launchpad_pool_state(data: &[u8]) -> Result<JsValue, JsValue> {
     let migrate_type = buf[off];
     off += 1;
 
-    // 3) core u64 fields
     let supply = read_u64(buf, &mut off)?;
     let total_base_sell = read_u64(buf, &mut off)?;
+    let total_quote_fund_raising = read_u64(buf, &mut off)?;
     let virtual_base = read_u64(buf, &mut off)?;
     let virtual_quote = read_u64(buf, &mut off)?;
     let real_base = read_u64(buf, &mut off)?;
@@ -285,6 +283,11 @@ pub fn parse_launchpad_pool_state(data: &[u8]) -> Result<JsValue, JsValue> {
         &obj,
         &"total_base_sell".into(),
         &BigInt::from(total_base_sell).into(),
+    )?;
+    Reflect::set(
+        &obj,
+        &"total_quote_fund_raising".into(),
+        &BigInt::from(total_quote_fund_raising).into(),
     )?;
     Reflect::set(
         &obj,
