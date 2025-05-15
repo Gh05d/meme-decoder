@@ -163,6 +163,45 @@ pub fn parse_boop_create_token(data: &[u8]) -> Result<JsValue, JsValue> {
     to_value(&resp).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
 }
 
+/// WASM-exported parser for Raydium initialize
+#[wasm_bindgen(js_name = "parseRaydiumInitialize")]
+pub fn parse_raydium_initialize(data: &[u8]) -> Result<JsValue, JsValue> {
+    let buf: &[u8] = payload(data)?;
+    // Reuse BorshDeserialize on your IDL-matching struct here.
+    let init: InitializeData = InitializeData::try_from_slice(buf)
+        .map_err(|e| JsValue::from_str(&format!("Deserialization failed: {}", e)))?;
+
+    let simple = InitializeSimple {
+        name: init.base_mint_param.name,
+        symbol: init.base_mint_param.symbol,
+    };
+    to_value(&simple).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
+}
+
+/// WASM-exported parser for Moonshot `initialize` instruction data
+#[wasm_bindgen(js_name = "parseMoonshotTokenMint")]
+pub fn parse_moonshot_token_mint(data: &[u8]) -> Result<JsValue, JsValue> {
+    // 1. Get the payload (skip the 8-byte discriminator)
+    let buf = payload(data)?;
+
+    // First try the manual parser which is more reliable
+    let mut off = 0;
+    let name = match read_string(buf, &mut off) {
+        Ok(name) => name,
+        Err(_) => return Err(JsValue::from_str("Failed to parse name")),
+    };
+
+    let symbol = match read_string(buf, &mut off) {
+        Ok(symbol) => symbol,
+        Err(_) => return Err(JsValue::from_str("Failed to parse symbol")),
+    };
+
+    let token_info = InitializeSimple { name, symbol };
+
+    // Convert to JsValue using to_value
+    to_value(&token_info).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
+}
+
 /// WASM-exported parser for Pump.fun create instruction
 #[wasm_bindgen(js_name = "parsePumpFunCreate")]
 pub fn parse_pump_fun_create(data: &[u8]) -> Result<JsValue, JsValue> {
