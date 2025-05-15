@@ -257,11 +257,11 @@ pub fn parse_launchpad_pool_state(data: &[u8]) -> Result<JsValue, JsValue> {
 
     let supply = read_u64(buf, &mut off)?;
     let total_base_sell = read_u64(buf, &mut off)?;
-    let total_quote_fund_raising = read_u64(buf, &mut off)?;
     let virtual_base = read_u64(buf, &mut off)?;
     let virtual_quote = read_u64(buf, &mut off)?;
     let real_base = read_u64(buf, &mut off)?;
     let real_quote = read_u64(buf, &mut off)?;
+    let total_quote_fund_raising = read_u64(buf, &mut off)?;
 
     // Build JS object with key fields
     let obj = Object::new();
