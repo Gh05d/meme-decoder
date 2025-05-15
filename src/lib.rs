@@ -1,5 +1,6 @@
 use borsh::BorshDeserialize;
 use bs58::encode as bs58_encode;
+use js_sys::{BigInt, Object, Reflect};
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::to_value;
 use std::str;
@@ -90,17 +91,6 @@ struct ComputedTokenMetaData {
     developer: String,
 }
 
-// helper that turns every u64 into a string
-#[derive(Serialize)]
-struct BondingCurveStateJs {
-    real_sol_reserves: String,
-    real_token_reserves: String,
-    virtual_token_reserves: String,
-    virtual_sol_reserves: String,
-    token_total_supply: String,
-    complete: bool,
-}
-
 // The three Curve variants
 #[derive(BorshDeserialize, Serialize, Deserialize)]
 pub struct ConstantCurve {
@@ -124,7 +114,7 @@ pub struct LinearCurve {
     pub migrate_type: u8,
 }
 
-// 3) CurveParams enum ⟶ matches IDL "CurveParams"
+// 3) CurveParams enum   matches IDL "CurveParams"
 #[derive(BorshDeserialize, Serialize, Deserialize)]
 pub enum CurveParams {
     Constant { data: ConstantCurve },
@@ -197,9 +187,9 @@ pub fn parse_pump_fun_create(data: &[u8]) -> Result<JsValue, JsValue> {
     to_value(&meta).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
 }
 
-/// WASM-exported parser for curve state
-#[wasm_bindgen(js_name = "parseCurveState")]
-pub fn parse_curve_state(data: &[u8]) -> Result<JsValue, JsValue> {
+/// WASM-exported parser for curve state using JS BigInt
+#[wasm_bindgen(js_name = "parseCurveStateBigInt")]
+pub fn parse_curve_state_bigint(data: &[u8]) -> Result<JsValue, JsValue> {
     let buf = payload(data)?;
     let mut off = 0;
 
@@ -216,16 +206,36 @@ pub fn parse_curve_state(data: &[u8]) -> Result<JsValue, JsValue> {
     }
     let complete = buf[off] != 0;
 
-    let state_js = BondingCurveStateJs {
-        virtual_token_reserves: virtual_token_reserves.to_string(),
-        virtual_sol_reserves: virtual_sol_reserves.to_string(),
-        real_token_reserves: real_token_reserves.to_string(),
-        real_sol_reserves: real_sol_reserves.to_string(),
-        token_total_supply: token_total_supply.to_string(),
-        complete,
-    };
+    // Build a JS object with native BigInt fields
+    let obj = Object::new();
+    Reflect::set(
+        &obj,
+        &"virtual_token_reserves".into(),
+        &BigInt::from(virtual_token_reserves).into(),
+    )?;
+    Reflect::set(
+        &obj,
+        &"virtual_sol_reserves".into(),
+        &BigInt::from(virtual_sol_reserves).into(),
+    )?;
+    Reflect::set(
+        &obj,
+        &"real_token_reserves".into(),
+        &BigInt::from(real_token_reserves).into(),
+    )?;
+    Reflect::set(
+        &obj,
+        &"real_sol_reserves".into(),
+        &BigInt::from(real_sol_reserves).into(),
+    )?;
+    Reflect::set(
+        &obj,
+        &"token_total_supply".into(),
+        &BigInt::from(token_total_supply).into(),
+    )?;
+    Reflect::set(&obj, &"complete".into(), &JsValue::from_bool(complete))?;
 
-    to_value(&state_js).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
+    Ok(JsValue::from(obj))
 }
 
 /// WASM-exported parser for Raydium initialize

@@ -7,7 +7,7 @@ repository = "https://github.com/Gh05d/meme-decoder"
 license = "UNLICENSE-1.1"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen       = "0.2"                # JS interop
@@ -18,4 +18,4 @@ bs58                = "0.4"                # Base58 encoding for public keys :co
 serde_json = "1.0"
 console_error_panic_hook = "0.1.7"
 web-sys = { version = "0.3", features = ["console"] }
-
+js-sys      = "0.3"     # for js_sys::BigInt, Object, Reflect

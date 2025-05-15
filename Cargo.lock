@@ -131,6 +131,7 @@ dependencies = [
  "borsh",
  "bs58",
  "console_error_panic_hook",
+ "js-sys",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
