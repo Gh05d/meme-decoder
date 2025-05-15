@@ -188,7 +188,7 @@ pub fn parse_pump_fun_create(data: &[u8]) -> Result<JsValue, JsValue> {
 }
 
 /// WASM-exported parser for curve state using JS BigInt
-#[wasm_bindgen(js_name = "parseCurveStateBigInt")]
+#[wasm_bindgen(js_name = "parseCurveState")]
 pub fn parse_curve_state_bigint(data: &[u8]) -> Result<JsValue, JsValue> {
     let buf = payload(data)?;
     let mut off = 0;
