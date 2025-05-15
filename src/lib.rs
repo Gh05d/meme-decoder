@@ -276,8 +276,8 @@ pub fn parse_launchpad_pool_state(data: &[u8]) -> Result<JsValue, JsValue> {
         &"virtualQuote".into(),
         &BigInt::from(virtual_quote).into(),
     )?;
-    Reflect::set(&obj, &"real_base".into(), &BigInt::from(real_base).into())?;
-    Reflect::set(&obj, &"real_quote".into(), &BigInt::from(real_quote).into())?;
+    Reflect::set(&obj, &"realBase".into(), &BigInt::from(real_base).into())?;
+    Reflect::set(&obj, &"realQuote".into(), &BigInt::from(real_quote).into())?;
     Reflect::set(&obj, &"supply".into(), &BigInt::from(supply).into())?;
     Reflect::set(
         &obj,
