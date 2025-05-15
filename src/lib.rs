@@ -187,26 +187,26 @@ pub fn parse_pump_fun_create(data: &[u8]) -> Result<JsValue, JsValue> {
     to_value(&meta).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
 }
 
-/// WASM-exported parser for curve state using JS BigInt
-#[wasm_bindgen(js_name = "parseCurveState")]
-pub fn parse_curve_state_bigint(data: &[u8]) -> Result<JsValue, JsValue> {
+/// WASM-exported parser for Pump.fun-style curve state using JS BigInt
+#[wasm_bindgen(js_name = "parsePumpFunCurveState")]
+pub fn parse_pump_fun_curve_state(data: &[u8]) -> Result<JsValue, JsValue> {
     let buf = payload(data)?;
     let mut off = 0;
 
-    // Read raw reserves as u64
+    // Read Pump.fun u64 reserves in original order
     let virtual_token_reserves = read_u64(buf, &mut off)?;
     let virtual_sol_reserves = read_u64(buf, &mut off)?;
     let real_token_reserves = read_u64(buf, &mut off)?;
     let real_sol_reserves = read_u64(buf, &mut off)?;
     let token_total_supply = read_u64(buf, &mut off)?;
 
-    // Read completion flag
+    // Read completion flag (bool)
     if buf.len() < off + 1 {
         return Err(JsValue::from_str("Unexpected end of buffer"));
     }
     let complete = buf[off] != 0;
 
-    // Build a JS object with native BigInt fields
+    // Build JS object with BigInt and boolean
     let obj = Object::new();
     Reflect::set(
         &obj,
@@ -238,41 +238,68 @@ pub fn parse_curve_state_bigint(data: &[u8]) -> Result<JsValue, JsValue> {
     Ok(JsValue::from(obj))
 }
 
-/// WASM-exported parser for Raydium initialize
-#[wasm_bindgen(js_name = "parseRaydiumInitialize")]
-pub fn parse_raydium_initialize(data: &[u8]) -> Result<JsValue, JsValue> {
-    let buf: &[u8] = payload(data)?;
-    // Reuse BorshDeserialize on your IDL-matching struct here.
-    let init: InitializeData = InitializeData::try_from_slice(buf)
-        .map_err(|e| JsValue::from_str(&format!("Deserialization failed: {}", e)))?;
-
-    let simple = InitializeSimple {
-        name: init.base_mint_param.name,
-        symbol: init.base_mint_param.symbol,
-    };
-    to_value(&simple).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
-}
-
-/// WASM-exported parser for Moonshot `initialize` instruction data
-#[wasm_bindgen(js_name = "parseMoonshotTokenMint")]
-pub fn parse_moonshot_token_mint(data: &[u8]) -> Result<JsValue, JsValue> {
-    // 1. Get the payload (skip the 8-byte discriminator)
+/// WASM-exported parser for Raydium Launchpad PoolState using JS BigInt
+#[wasm_bindgen(js_name = "parseLaunchpadPoolState")]
+pub fn parse_launchpad_pool_state(data: &[u8]) -> Result<JsValue, JsValue> {
     let buf = payload(data)?;
-
-    // First try the manual parser which is more reliable
     let mut off = 0;
-    let name = match read_string(buf, &mut off) {
-        Ok(name) => name,
-        Err(_) => return Err(JsValue::from_str("Failed to parse name")),
-    };
 
-    let symbol = match read_string(buf, &mut off) {
-        Ok(symbol) => symbol,
-        Err(_) => return Err(JsValue::from_str("Failed to parse symbol")),
-    };
+    // Anchor discriminator stripped; now parse PoolState fields in IDL order
+    let epoch = read_u64(buf, &mut off)?;
+    off += 1;
+    let status = buf[off];
+    off += 1;
+    let base_decimals = buf[off];
+    off += 1;
+    let quote_decimals = buf[off];
+    off += 1;
+    let migrate_type = buf[off];
+    off += 1;
+    let supply = read_u64(buf, &mut off)?;
+    let total_base_sell = read_u64(buf, &mut off)?;
+    let virtual_base = read_u64(buf, &mut off)?;
+    let virtual_quote = read_u64(buf, &mut off)?;
+    let real_base = read_u64(buf, &mut off)?;
+    let real_quote = read_u64(buf, &mut off)?;
+    // (rest of fields omitted for brevity)
 
-    let token_info = InitializeSimple { name, symbol };
+    // Build JS object with key fields
+    let obj = Object::new();
+    Reflect::set(&obj, &"status".into(), &JsValue::from_f64(status as f64))?;
+    Reflect::set(
+        &obj,
+        &"virtual_base".into(),
+        &BigInt::from(virtual_base).into(),
+    )?;
+    Reflect::set(
+        &obj,
+        &"virtual_quote".into(),
+        &BigInt::from(virtual_quote).into(),
+    )?;
+    Reflect::set(&obj, &"real_base".into(), &BigInt::from(real_base).into())?;
+    Reflect::set(&obj, &"real_quote".into(), &BigInt::from(real_quote).into())?;
+    Reflect::set(&obj, &"supply".into(), &BigInt::from(supply).into())?;
+    Reflect::set(
+        &obj,
+        &"total_base_sell".into(),
+        &BigInt::from(total_base_sell).into(),
+    )?;
+    Reflect::set(
+        &obj,
+        &"base_decimals".into(),
+        &JsValue::from_f64(base_decimals as f64),
+    )?;
+    Reflect::set(
+        &obj,
+        &"quote_decimals".into(),
+        &JsValue::from_f64(quote_decimals as f64),
+    )?;
+    Reflect::set(
+        &obj,
+        &"migrate_type".into(),
+        &JsValue::from_f64(migrate_type as f64),
+    )?;
+    Reflect::set(&obj, &"epoch".into(), &BigInt::from(epoch).into())?;
 
-    // Convert to JsValue using to_value
-    to_value(&token_info).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
+    Ok(JsValue::from(obj))
 }
