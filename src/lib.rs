@@ -90,14 +90,14 @@ struct ComputedTokenMetaData {
     developer: String,
 }
 
-/// Bonding curve state struct.
+// helper that turns every u64 into a string
 #[derive(Serialize)]
-struct BondingCurveState {
-    virtual_token_reserves: u64,
-    virtual_sol_reserves: u64,
-    real_token_reserves: u64,
-    real_sol_reserves: u64,
-    token_total_supply: u64,
+struct BondingCurveStateJs {
+    real_sol_reserves: String,
+    real_token_reserves: String,
+    virtual_token_reserves: String,
+    virtual_sol_reserves: String,
+    token_total_supply: String,
     complete: bool,
 }
 
@@ -202,25 +202,30 @@ pub fn parse_pump_fun_create(data: &[u8]) -> Result<JsValue, JsValue> {
 pub fn parse_curve_state(data: &[u8]) -> Result<JsValue, JsValue> {
     let buf = payload(data)?;
     let mut off = 0;
+
+    // Read raw reserves as u64
     let virtual_token_reserves = read_u64(buf, &mut off)?;
     let virtual_sol_reserves = read_u64(buf, &mut off)?;
     let real_token_reserves = read_u64(buf, &mut off)?;
     let real_sol_reserves = read_u64(buf, &mut off)?;
     let token_total_supply = read_u64(buf, &mut off)?;
+
+    // Read completion flag
     if buf.len() < off + 1 {
         return Err(JsValue::from_str("Unexpected end of buffer"));
     }
     let complete = buf[off] != 0;
 
-    let state = BondingCurveState {
-        virtual_token_reserves,
-        virtual_sol_reserves,
-        real_token_reserves,
-        real_sol_reserves,
-        token_total_supply,
+    let state_js = BondingCurveStateJs {
+        virtual_token_reserves: virtual_token_reserves.to_string(),
+        virtual_sol_reserves: virtual_sol_reserves.to_string(),
+        real_token_reserves: real_token_reserves.to_string(),
+        real_sol_reserves: real_sol_reserves.to_string(),
+        token_total_supply: token_total_supply.to_string(),
         complete,
     };
-    to_value(&state).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
+
+    to_value(&state_js).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
 }
 
 /// WASM-exported parser for Raydium initialize
