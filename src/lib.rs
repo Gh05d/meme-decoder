@@ -268,12 +268,12 @@ pub fn parse_launchpad_pool_state(data: &[u8]) -> Result<JsValue, JsValue> {
     Reflect::set(&obj, &"status".into(), &JsValue::from_f64(status as f64))?;
     Reflect::set(
         &obj,
-        &"virtual_base".into(),
+        &"virtualBase".into(),
         &BigInt::from(virtual_base).into(),
     )?;
     Reflect::set(
         &obj,
-        &"virtual_quote".into(),
+        &"virtualQuote".into(),
         &BigInt::from(virtual_quote).into(),
     )?;
     Reflect::set(&obj, &"real_base".into(), &BigInt::from(real_base).into())?;
@@ -281,27 +281,27 @@ pub fn parse_launchpad_pool_state(data: &[u8]) -> Result<JsValue, JsValue> {
     Reflect::set(&obj, &"supply".into(), &BigInt::from(supply).into())?;
     Reflect::set(
         &obj,
-        &"total_base_sell".into(),
+        &"totalBaseSell".into(),
         &BigInt::from(total_base_sell).into(),
     )?;
     Reflect::set(
         &obj,
-        &"total_quote_fund_raising".into(),
+        &"totalQuoteFundRaising".into(),
         &BigInt::from(total_quote_fund_raising).into(),
     )?;
     Reflect::set(
         &obj,
-        &"base_decimals".into(),
+        &"baseDecimals".into(),
         &JsValue::from_f64(base_decimals as f64),
     )?;
     Reflect::set(
         &obj,
-        &"quote_decimals".into(),
+        &"quoteDecimals".into(),
         &JsValue::from_f64(quote_decimals as f64),
     )?;
     Reflect::set(
         &obj,
-        &"migrate_type".into(),
+        &"migrateType".into(),
         &JsValue::from_f64(migrate_type as f64),
     )?;
     Reflect::set(&obj, &"epoch".into(), &BigInt::from(epoch).into())?;
