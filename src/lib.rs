@@ -12,7 +12,7 @@ macro_rules! console_log {
     ($($t:tt)*) => (web_sys::console::log_1(&format!($($t)*).into()));
 }
 
-// NOTE: Functions
+// INFO: Functions
 /// Skip the 8-byte discriminator and return the payload or an error.
 fn payload<'a>(data: &'a [u8]) -> Result<&'a [u8], JsValue> {
     if data.len() < 8 {
@@ -64,7 +64,7 @@ fn read_pubkey(buf: &[u8], off: &mut usize) -> Result<String, JsValue> {
     Ok(bs58_encode(key).into_string())
 }
 
-// NOTE: Structs
+// INFO: Structs
 #[derive(Serialize)]
 struct InitializeSimple {
     name: String,
@@ -148,7 +148,7 @@ pub struct InitializeData {
     pub vesting_param: VestingParam,
 }
 
-// NOTE: Parsers
+// INFO: Parsers
 /// WASM-exported parser for Boop.create_token
 #[wasm_bindgen(js_name = "parseBoopCreateToken")]
 pub fn parse_boop_create_token(data: &[u8]) -> Result<JsValue, JsValue> {
@@ -366,97 +366,16 @@ pub fn parse_launchpad_global_config(data: &[u8]) -> Result<JsValue, JsValue> {
     let buf = payload(data)?;
     let mut off = 0;
 
-    // 1) Fixed-length fields
-    let epoch = read_u64(buf, &mut off)?;
+    // Only read the curve_type field
+    off += 8; // Skip the epoch (u64)
     let curve_type = buf[off];
-    off += 1;
-    let idx_bytes: [u8; 2] = read_le::<2>(buf, &mut off)?;
-    let index = u16::from_le_bytes(idx_bytes);
-    let migrate_fee = read_u64(buf, &mut off)?;
-    let trade_fee_rate = read_u64(buf, &mut off)?;
-    let max_share_fee_rate = read_u64(buf, &mut off)?;
-    let min_base_supply = read_u64(buf, &mut off)?;
-    let max_lock_rate = read_u64(buf, &mut off)?;
-    let min_base_sell_rate = read_u64(buf, &mut off)?;
-    let min_base_migrate_rate = read_u64(buf, &mut off)?;
-    let min_quote_fund_raising = read_u64(buf, &mut off)?;
 
-    // 2) Pubkey fields (32 bytes each)
-    let quote_mint = read_pubkey(buf, &mut off)?;
-    let protocol_fee_owner = read_pubkey(buf, &mut off)?;
-    let migrate_fee_owner = read_pubkey(buf, &mut off)?;
-    let migrate_to_amm_wallet = read_pubkey(buf, &mut off)?;
-    let migrate_to_cpswap_wallet = read_pubkey(buf, &mut off)?;
-
-    // 3) Build JS object
+    // Return curve_type as a JS object
     let obj = Object::new();
-    Reflect::set(&obj, &"epoch".into(), &BigInt::from(epoch).into())?;
     Reflect::set(
         &obj,
         &"curveType".into(),
         &JsValue::from_f64(curve_type as f64),
-    )?;
-    Reflect::set(&obj, &"index".into(), &JsValue::from_f64(index as f64))?;
-    Reflect::set(
-        &obj,
-        &"migrateFee".into(),
-        &BigInt::from(migrate_fee).into(),
-    )?;
-    Reflect::set(
-        &obj,
-        &"tradeFeeRate".into(),
-        &BigInt::from(trade_fee_rate).into(),
-    )?;
-    Reflect::set(
-        &obj,
-        &"maxShareFeeRate".into(),
-        &BigInt::from(max_share_fee_rate).into(),
-    )?;
-    Reflect::set(
-        &obj,
-        &"minBaseSupply".into(),
-        &BigInt::from(min_base_supply).into(),
-    )?;
-    Reflect::set(
-        &obj,
-        &"maxLockRate".into(),
-        &BigInt::from(max_lock_rate).into(),
-    )?;
-    Reflect::set(
-        &obj,
-        &"minBaseSellRate".into(),
-        &BigInt::from(min_base_sell_rate).into(),
-    )?;
-    Reflect::set(
-        &obj,
-        &"minBaseMigrateRate".into(),
-        &BigInt::from(min_base_migrate_rate).into(),
-    )?;
-    Reflect::set(
-        &obj,
-        &"minQuoteFundRaising".into(),
-        &BigInt::from(min_quote_fund_raising).into(),
-    )?;
-    Reflect::set(&obj, &"quoteMint".into(), &JsValue::from_str(&quote_mint))?;
-    Reflect::set(
-        &obj,
-        &"protocolFeeOwner".into(),
-        &JsValue::from_str(&protocol_fee_owner),
-    )?;
-    Reflect::set(
-        &obj,
-        &"migrateFeeOwner".into(),
-        &JsValue::from_str(&migrate_fee_owner),
-    )?;
-    Reflect::set(
-        &obj,
-        &"migrateToAmmWallet".into(),
-        &JsValue::from_str(&migrate_to_amm_wallet),
-    )?;
-    Reflect::set(
-        &obj,
-        &"migrateToCpswapWallet".into(),
-        &JsValue::from_str(&migrate_to_cpswap_wallet),
     )?;
 
     Ok(JsValue::from(obj))
