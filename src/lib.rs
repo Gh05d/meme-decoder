@@ -306,7 +306,8 @@ pub fn parse_launchpad_pool_state(data: &[u8]) -> Result<JsValue, JsValue> {
     off += 8 * 8;
 
     let global_config = read_pubkey(buf, &mut off)?;
-    off += 32;
+    // skip platform_config and base_mint (2 pubkeys)
+    off += 32 * 2;
     let quote_mint = read_pubkey(buf, &mut off)?;
 
     // Build JS object with key fields
