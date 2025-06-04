@@ -28,7 +28,9 @@ cd meme-decoder
 
 ## Build the WebAssembly package
 
-`wasm-pack build --target web`
+Run `npm run build` to compile the WASM package. If a `../meme-farmer` directory
+exists next to `meme-decoder`, the build script also copies the generated `pkg/`
+folder there.
 
 ## Usage
 
