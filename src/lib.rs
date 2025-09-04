@@ -402,10 +402,28 @@ pub fn parse_launchpad_global_config(data: &[u8]) -> Result<JsValue, JsValue> {
 
 #[wasm_bindgen(js_name = "parseMeteoraInitialize")]
 pub fn parse_meteora_initialize(ix_data: &[u8], accounts: JsValue) -> Result<JsValue, JsValue> {
-    // 1) Args exakt wie IDL
-    let p = payload(ix_data)?;
-    let params = InitializePoolParameters::try_from_slice(p)
-        .map_err(|e| JsValue::from_str(&format!("Borsh: {e}")))?;
+    // Try decode assuming discriminator is present (skip 8), then fallback to raw.
+    let try_decode = |buf: &[u8]| -> Result<InitializePoolParameters, JsValue> {
+        // Borsh::deserialize expects &mut &[u8], not a Cursor.
+        let mut slice = buf;
+        InitializePoolParameters::deserialize(&mut slice)
+            .map_err(|e| JsValue::from_str(&format!("Borsh: {}", e)))
+    };
+
+    // Attempt A: data includes 8-byte header
+    let args = match payload(ix_data) {
+        Ok(body) => match try_decode(body) {
+            Ok(a) => a,
+            Err(_e1) => {
+                // Attempt B: data already header-less; decode from start
+                try_decode(ix_data)?
+            }
+        },
+        Err(_e0) => {
+            // Too short or not a header; try raw
+            try_decode(ix_data)?
+        }
+    };
 
     // 2) Accounts aus Webhook/WS: Array von Base58-Strings
     let accs = Array::from(&accounts);
@@ -418,13 +436,13 @@ pub fn parse_meteora_initialize(ix_data: &[u8], accounts: JsValue) -> Result<JsV
     // Indizes lt. IDL:
     // 2 = creator, 3 = base_mint, 5 = pool (PoolState)
     let out = MeteoraInitializeOut {
-        name: params.name,
-        symbol: params.symbol,
-        uri: params.uri,
+        name: args.name,
+        symbol: args.symbol,
+        uri: args.uri,
         developer: get(2)?,
         mint: get(3)?,
         bonding_curve: get(5)?,
     };
 
-    to_value(&out).map_err(|e| JsValue::from_str(&format!("serde: {e}")))
+    to_value(&out).map_err(|e| JsValue::from_str(&format!("serde: {}", e)))
 }
