@@ -13,7 +13,7 @@ macro_rules! console_log {
     ($($t:tt)*) => (web_sys::console::log_1(&format!($($t)*).into()));
 }
 
-// INFO: Functions
+// ---- Functions
 /// Skip the 8-byte discriminator and return the payload or an error.
 fn payload<'a>(data: &'a [u8]) -> Result<&'a [u8], JsValue> {
     if data.len() < 8 {
@@ -65,7 +65,7 @@ fn read_pubkey(buf: &[u8], off: &mut usize) -> Result<String, JsValue> {
     Ok(bs58_encode(key).into_string())
 }
 
-// INFO: Structs
+// ---- Structs
 #[derive(Serialize)]
 struct InitializeSimple {
     name: String,
