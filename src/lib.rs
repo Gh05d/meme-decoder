@@ -141,7 +141,7 @@ pub enum CurveParams {
 }
 
 #[derive(BorshDeserialize, Serialize, Deserialize)]
-pub struct VestingParam {
+pub struct VestingParams {
     /// number of tokens locked, as a u64
     pub total_locked_amount: u64,
     /// cliff (in seconds, or whatever unit your IDL uses)
@@ -160,11 +160,44 @@ pub struct MintParams {
 }
 
 #[derive(BorshDeserialize, Serialize, Deserialize)]
-pub struct InitializeData {
+pub enum AmmCreatorFeeOn {
+    QuoteToken,
+    BothToken,
+}
+
+#[derive(BorshDeserialize, Serialize, Deserialize)]
+pub struct TransferFeeExtensionParams {
+    pub transfer_fee_basis_points: u16,
+    pub maximum_fee: u64,
+}
+
+#[derive(BorshDeserialize, Serialize, Deserialize)]
+pub struct InitializeV1 {
     pub base_mint_param: MintParams,
     pub curve_param: CurveParams,
-    pub vesting_param: VestingParam,
+    pub vesting_param: VestingParams,
 }
+
+#[derive(BorshDeserialize, Serialize, Deserialize)]
+pub struct InitializeV2 {
+    pub base_mint_param: MintParams,
+    pub curve_param: CurveParams,
+    pub vesting_param: VestingParams,
+    pub amm_fee_on: AmmCreatorFeeOn,
+}
+
+#[derive(BorshDeserialize, Serialize, Deserialize)]
+pub struct InitializeT22 {
+    pub base_mint_param: MintParams,
+    pub curve_param: CurveParams,
+    pub vesting_param: VestingParams,
+    pub amm_fee_on: AmmCreatorFeeOn,
+    pub transfer_fee_extension_param: Option<TransferFeeExtensionParams>,
+}
+
+const D_RAY_INIT: [u8; 8] = [0xaf, 0xaf, 0x6d, 0x1f, 0x0d, 0x98, 0x9b, 0xed];
+const D_RAY_INIT_V2: [u8; 8] = [0x43, 0x99, 0xaf, 0x27, 0xda, 0x10, 0x26, 0x20];
+const D_RAY_INIT_T22: [u8; 8] = [0x25, 0xbe, 0x7e, 0xde, 0x2c, 0x9a, 0xab, 0x11];
 
 // INFO: Parsers
 /// WASM-exported parser for Boop.create_token
@@ -184,16 +217,29 @@ pub fn parse_boop_create_token(data: &[u8]) -> Result<JsValue, JsValue> {
 /// WASM-exported parser for Raydium initialize
 #[wasm_bindgen(js_name = "parseRaydiumInitialize")]
 pub fn parse_raydium_initialize(data: &[u8]) -> Result<JsValue, JsValue> {
-    let buf: &[u8] = payload(data)?;
-    // Reuse BorshDeserialize on your IDL-matching struct here.
-    let init: InitializeData = InitializeData::try_from_slice(buf)
-        .map_err(|e| JsValue::from_str(&format!("Deserialization failed: {}", e)))?;
+    if data.len() < 8 {
+        return Err(JsValue::from_str("short data"));
+    }
+    let (head, buf) = (&data[..8], &data[8..]);
 
-    let simple = InitializeSimple {
-        name: init.base_mint_param.name,
-        symbol: init.base_mint_param.symbol,
+    let (name, symbol) = if head == D_RAY_INIT {
+        let v: InitializeV1 = BorshDeserialize::try_from_slice(buf)
+            .map_err(|e| JsValue::from_str(&format!("Deserialization failed: {}", e)))?;
+        (v.base_mint_param.name, v.base_mint_param.symbol)
+    } else if head == D_RAY_INIT_V2 {
+        let v: InitializeV2 = BorshDeserialize::try_from_slice(buf)
+            .map_err(|e| JsValue::from_str(&format!("Deserialization failed: {}", e)))?;
+        (v.base_mint_param.name, v.base_mint_param.symbol)
+    } else if head == D_RAY_INIT_T22 {
+        let v: InitializeT22 = BorshDeserialize::try_from_slice(buf)
+            .map_err(|e| JsValue::from_str(&format!("Deserialization failed: {}", e)))?;
+        (v.base_mint_param.name, v.base_mint_param.symbol)
+    } else {
+        return Err(JsValue::from_str("not a Raydium initialize ix"));
     };
-    to_value(&simple).map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
+
+    to_value(&InitializeSimple { name, symbol })
+        .map_err(|e| JsValue::from_str(&format!("Serialization failed: {}", e)))
 }
 
 /// WASM-exported parser for Moonshot `initialize` instruction data
