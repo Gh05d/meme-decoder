@@ -91,6 +91,13 @@ struct ComputedTokenMetaData {
     developer: String,
 }
 
+#[derive(BorshDeserialize, Serialize)]
+pub struct InitializePoolParameters {
+    pub name: String,
+    pub symbol: String,
+    pub uri: String,
+}
+
 // The three Curve variants
 #[derive(BorshDeserialize, Serialize, Deserialize)]
 pub struct ConstantCurve {
@@ -380,4 +387,13 @@ pub fn parse_launchpad_global_config(data: &[u8]) -> Result<JsValue, JsValue> {
     )?;
 
     Ok(JsValue::from(obj))
+}
+
+#[wasm_bindgen(js_name = "parseMeteoraInitialize")]
+pub fn parse_meteora_initialize(data: &[u8]) -> Result<JsValue, JsValue> {
+    let buf = payload(data)?; // 8-Byte Anchor-Discriminator überspringen
+    let args = InitializePoolParameters::try_from_slice(buf)
+        .map_err(|e| JsValue::from_str(&format!("borsh decode failed: {e}")))?;
+    serde_wasm_bindgen::to_value(&args)
+        .map_err(|e| JsValue::from_str(&format!("to_value failed: {e}")))
 }
