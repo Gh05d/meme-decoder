@@ -1,5 +1,6 @@
 use borsh::BorshDeserialize;
 use bs58::encode as bs58_encode;
+use js_sys::Array;
 use js_sys::{BigInt, Object, Reflect};
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::to_value;
@@ -119,6 +120,16 @@ pub struct LinearCurve {
     pub supply: u64,
     pub total_quote_fund_raising: u64,
     pub migrate_type: u8,
+}
+
+#[derive(Serialize)]
+struct MeteoraInitializeOut {
+    name: String,
+    symbol: String,
+    uri: String,
+    mint: String,          // base_mint (idx 3)
+    bonding_curve: String, // pool / PoolState (idx 5)
+    developer: String,     // creator (idx 2)
 }
 
 // 3) CurveParams enum   matches IDL "CurveParams"
@@ -390,10 +401,30 @@ pub fn parse_launchpad_global_config(data: &[u8]) -> Result<JsValue, JsValue> {
 }
 
 #[wasm_bindgen(js_name = "parseMeteoraInitialize")]
-pub fn parse_meteora_initialize(data: &[u8]) -> Result<JsValue, JsValue> {
-    let buf = payload(data)?; // 8-Byte Anchor-Discriminator überspringen
-    let args = InitializePoolParameters::try_from_slice(buf)
-        .map_err(|e| JsValue::from_str(&format!("borsh decode failed: {e}")))?;
-    serde_wasm_bindgen::to_value(&args)
-        .map_err(|e| JsValue::from_str(&format!("to_value failed: {e}")))
+pub fn parse_meteora_initialize(ix_data: &[u8], accounts: JsValue) -> Result<JsValue, JsValue> {
+    // 1) Args exakt wie IDL
+    let p = payload(ix_data)?;
+    let params = InitializePoolParameters::try_from_slice(p)
+        .map_err(|e| JsValue::from_str(&format!("Borsh: {e}")))?;
+
+    // 2) Accounts aus Webhook/WS: Array von Base58-Strings
+    let accs = Array::from(&accounts);
+    let get = |i: u32| {
+        accs.get(i)
+            .as_string()
+            .ok_or(JsValue::from_str("bad accounts[i]"))
+    };
+
+    // Indizes lt. IDL:
+    // 2 = creator, 3 = base_mint, 5 = pool (PoolState)
+    let out = MeteoraInitializeOut {
+        name: params.name,
+        symbol: params.symbol,
+        uri: params.uri,
+        developer: get(2)?,
+        mint: get(3)?,
+        bonding_curve: get(5)?,
+    };
+
+    to_value(&out).map_err(|e| JsValue::from_str(&format!("serde: {e}")))
 }
